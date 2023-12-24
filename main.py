@@ -22,7 +22,7 @@ def downloadVid():
     done = ttk.Label(root, text="Done!")
     label2 = ttk.Label(root, text="Title: " + yt.title)
     label2.pack()
-    yd = yt.streams.get_highest_resolution() if res == "Highest" else yt.streams.get_lowest_resolution()
+    yd = yt.streams.get_highest_resolution() if res.get() == "Highest" else yt.streams.get_lowest_resolution()
     label3 = ttk.Label(root, text="File Size: " + str(yd.filesize_mb) + " MB")
     label3.pack()
     yd.download(directory)
