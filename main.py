@@ -1,53 +1,73 @@
+# Commands: pip install pytube
+#           pip install moviepy
+
+import argparse
+from pytube import Playlist
 from pytube import YouTube
-import tkinter
-from tkinter import simpledialog
-from tkinter import ttk
-from tkinter.filedialog import askdirectory
-import sv_ttk
+import os
 
-root = tkinter.Tk()
-root.geometry("500x500")
-root.title("EZTuber")
-res = tkinter.StringVar(root)
-res.set('Lowest')
+# MP4 to MP3
+from moviepy.editor import *
 
-sv_ttk.set_theme("dark")
 
-def callLink():
-    global link 
-    link = simpledialog.askstring("EZTuber", "Enter the URL of the YouTube video")
+# Fix goofy error when downloading some videos
+from pytube.innertube import _default_clients
+_default_clients["ANDROID_MUSIC"] = _default_clients["ANDROID_CREATOR"]
 
-def downloadVid():
-    yt = YouTube(link)
-    done = ttk.Label(root, text="Done!")
-    label2 = ttk.Label(root, text="Title: " + yt.title)
-    label2.pack()
-    yd = yt.streams.get_highest_resolution() if res.get() == "Highest" else yt.streams.get_lowest_resolution()
-    label3 = ttk.Label(root, text="File Size: " + str(yd.filesize_mb) + " MB")
-    label3.pack()
-    yd.download(directory)
-    done = ttk.Label(root, text="Done! Downloaded to: " + directory)
-    done.pack()
+def download_playlist(url, highres, audioonly, output_path='./'):
+    playlist = Playlist(url)
+    playlist_title = playlist.title
+    print(f'Downloading playlist: {playlist_title}')
+    
+    for video in playlist.videos:
+        print(f'Downloading video: {video.title}')
+        video.streams.get_highest_resolution().download(output_path) if highres else video.streams.get_lowest_resolution().download(output_path)
+        print(f'{video.title} downloaded successfully!')
+        
+        if audioonly:
+            print('Converting video to audio only')
+            mp4_to_mp3(video.title, output_path)
+            print('Converted video to audio only successfully!')
 
-def openDirectory():
-    global directory
-    directory = askdirectory()
+def download_video(url, highres, audioonly, output_path='./'):
+    yt = YouTube(url)
+    print(f'Downloading video: {yt.title}')
+    yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').last().download(output_path) if highres else yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').first().download(output_path)
+    print(f'{yt.title} downloaded successfully!')
 
-label = ttk.Label(root, text="EZTuber YouTube Downloader", font=("Comic Sans MS", 18))
-label.pack(pady=20, padx=20)
+    if audioonly:
+        print('Converting video to audio only')
+        mp4_to_mp3(yt.title, output_path)
+        print('Converted video to audio only successfully!')
 
-Directory = ttk.Button(root, text="Save Directory", command=openDirectory)
-Directory.pack(pady=10)
+def mp4_to_mp3(filename, output_path='./'):
+    newname = filename.replace('.', '') # remove periods
+    video = VideoFileClip(output_path + "/" + newname + ".mp4")
+    video.audio.write_audiofile(output_path + "/" + newname + ".mp3", verbose=False)
 
-linkbutton = ttk.Button(root, text="Add Link", command=callLink)
-linkbutton.pack(padx=20)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="YouTube Playlist Downloader")
+    parser.add_argument("--video", help="URL of the YouTube video", required=False)
+    parser.add_argument("--playlist", help="URL of the YouTube playlist", required=False)
+    parser.add_argument("--audio-only", help="URL of the YouTube playlist", action="store_true", required=False)
+    parser.add_argument("--highres", help="Sets high resolution", action="store_true", required=False)
+    parser.add_argument("--output", help="Output directory", default=os.path.join(os.path.expanduser('~'), 'Downloads'))
+    args = parser.parse_args()
 
-restxt = ttk.Label(root, text="Resolution:")
-restxt.pack(padx=5,pady=10)
-resolution = ttk.OptionMenu(root, res, "Lowest", "Lowest", "Highest")
-resolution.pack(padx=20, pady=10)
+    playlist_url = args.playlist
+    url = args.video
+    audioonly = args.audio_only
+    highres = args.highres
+    output_dir = args.output
+    
+    if playlist_url == None and url == None:
+        print("usage: ytdownloader.py [--video VIDEO_URL] [--playlist PLAYLIST_URL] [--audio-only] [--highres] [--output OUTPUT_DIRECTORY]")
+        exit(0)
 
-download = ttk.Button(root, text="Download", command=downloadVid) 
-download.pack(pady=25)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-root.mainloop()
+    if url:
+        download_video(url, highres, audioonly, output_dir)
+    elif playlist_url:
+        download_playlist(playlist_url, highres, audioonly, output_dir)
